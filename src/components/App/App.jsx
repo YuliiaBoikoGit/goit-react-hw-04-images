@@ -68,7 +68,7 @@ export const App = () => {
       <Container>
         <Searchbar onSubmit={handleFormSubmit} />
 
-        {images.length === 0 && !error && <Info>Your query is empty...</Info>}
+        {images.length === 0 && !error && !isLoading && <Info>Your query is empty...</Info>}
 
         {isLoading && <PageLoader />}
 
@@ -76,7 +76,7 @@ export const App = () => {
 
         {error && <Info>{error.message}</Info>}
 
-        {images.length >= itemsPerPage && <LoadButton onClick={loadMore} />}
+        {images.length >= itemsPerPage && imageName && <LoadButton onClick={loadMore} />}
         
         {showModal && <Modal onClose={toggleModal}>
             <img src={largeImage} alt="" />
