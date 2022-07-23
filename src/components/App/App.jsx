@@ -1,4 +1,4 @@
-import React from 'react';
+import { useState, useEffect } from 'react';
 import { ToastContainer } from 'react-toastify';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -10,128 +10,79 @@ import { fetchImages } from "api/galleryApi";
 import { Modal } from 'components/Modal/Modal';
 import { PageLoader } from 'components/Loader/Loader';
 
-export class App extends React.Component {
-  state = {
-    imageName: '',
-    page: 1,
-    images: [],
-    error: '',
-    showModal: false,
-    largeImage: '',
-    status: 'idle',
+export const App = () => {
+  const [imageName, setImageName] = useState('');
+  const [page, setPage] = useState(1);
+  const [images, setImages] = useState([]);
+  const [error, setError] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [largeImage, setLargeImage] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!imageName) return;
+
+      setIsLoading(true);
+      fetchImages(imageName, page)
+      .then(
+        data => {
+          if (data.total === 0) {
+            throw new Error('Sorry, there are no images matching your search query. Please try again.');
+          };
+
+          if (data.hits.length === 0) {
+            setImageName('');
+            return toast.error("We're sorry, but you've reached the end of search results.");
+          };
+
+          setImages(prevState => [...prevState, ...data.hits]);
+        })
+      .catch(error => setError(error))
+      .finally(() => setIsLoading(false));
+  }, [imageName, page]);
+
+  const handleFormSubmit = imageName => {
+    setImageName(imageName);
+    setPage(1);
+    setImages([]);
+    setError('');
   };
 
-  componentDidUpdate(prevProps, prevState) {
-    if (prevState.imageName !== this.state.imageName) {
-      this.setState({ status: 'pending' });
-      this.getImages()
-        .catch(error => this.setState({ error, status: 'rejected' }));
-    };
+  const handleLargeImage = largeImageURL => {
+    setLargeImage(largeImageURL);
+    setShowModal(true);
   };
 
-  handleFormSubmit = imageName => {
-    this.setState({
-      imageName,
-      page: 1,
-      images: [],
-    });
+  const toggleModal = () => {
+    setShowModal(prevState => !prevState);
+    setLargeImage('');
   };
 
-  handleLargeImage = largeImageURL => {
-    this.setState({
-      largeImage: largeImageURL,
-      showModal: true,
-    });
+  const loadMore = () => {
+    setPage(prevState => prevState + 1);
   };
 
-  toggleModal = () => {
-    this.setState(prevState => ({
-      showModal: !prevState.showModal,
-      largeImage: '',
-    }));
-  };
+  const itemsPerPage = 12;
 
-  getImages = async () => {
-    const { imageName, page } = this.state;
-    const data = await fetchImages(imageName, page);
-    
-    if (data.total === 0) {
-      throw new Error('Sorry, there are no images matching your search query. Please try again.');
-    };
+  return (
+      <Container>
+        <Searchbar onSubmit={handleFormSubmit} />
 
-    if (data.hits.length === 0) {
-      toast.error("We're sorry, but you've reached the end of search results.");
-      this.setState({ status: 'rejected' });
-    
-      return;
-    };
+        {images.length === 0 && !error && <Info>Your query is empty...</Info>}
 
-    this.setState(prevState => ({
-      images: [...prevState.images, ...data.hits],
-      page: prevState.page + 1,
-      status: 'resolved',
-    }));
-  };
+        {isLoading && <PageLoader />}
 
-  render() {
-    const { images, showModal, largeImage, error, status } = this.state;
+        <Gallery images={images} onImgClick={handleLargeImage}/>
 
-    if (status === 'idle') {
-      return (
-        <>
-          <Container>
-            <Searchbar onSubmit={this.handleFormSubmit} />
-            <Info>Your query is empty...</Info>
-            <ToastContainer position="top-center" />
-          </Container>
-        </>
-      );
-    };
+        {error && <Info>{error.message}</Info>}
 
-    if (status === 'pending') {
-      return (
-        <>
-          <Container>
-            <Searchbar onSubmit={this.handleFormSubmit} />
-            <PageLoader />
-            <ToastContainer position="top-center" />
-          </Container>
-        </>
-      );
-    };
-
-    if (status === 'rejected') {
-      return (
-        <>
-          <Container>
-            <Searchbar onSubmit={this.handleFormSubmit} />
-            <Info>{error.message}</Info>
-            <Gallery images={images} onImgClick={this.handleLargeImage} />
-              {showModal && <Modal onClose={this.toggleModal}>
-                <img src={largeImage} alt="" />
-              </Modal>}
-            <ToastContainer position="top-center" />
-          </Container>
-        </>
-      );
-    };
-
-    if (status === 'resolved') {
-      const itemsPerPage = 12;
-
-      return (
-        <>
-          <Container>
-            <Searchbar onSubmit={this.handleFormSubmit} />
-            <Gallery images={images} onImgClick={this.handleLargeImage} />
-            {images.length >= itemsPerPage && <LoadButton onClick={this.getImages} />}
-              {showModal && <Modal onClose={this.toggleModal}>
-                <img src={largeImage} alt="" />
-              </Modal>}
-            <ToastContainer position="top-center" />
-          </Container>
-        </>
-      );
-    };
-  };
+        {images.length >= itemsPerPage && <LoadButton onClick={loadMore} />}
+        
+        {showModal && <Modal onClose={toggleModal}>
+            <img src={largeImage} alt="" />
+        </Modal>}
+        
+        <ToastContainer position="top-center" />
+      </Container>
+  );
 };
